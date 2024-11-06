@@ -57,6 +57,8 @@ const isPointInPolygon = (point, polygon) => {
 export default function App() {
   const [model, setModel] = useState(null);
   const [modelLoading, setModelLoading] = useState(false);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCamera, setSelectedCamera] = useState(null);
   const [gameState, setGameState] = useState(initialGameState);
 
   const videoRef = useRef();
@@ -77,18 +79,33 @@ export default function App() {
   }, [modelLoading]);
 
   useEffect(() => {
-    if (model) {
+    navigator.mediaDevices.enumerateDevices()
+      .then(devices => {
+        const videoDevices = devices.filter(device => device.kind === "videoinput");
+        setCameras(videoDevices);
+        if (videoDevices.length > 0) {
+          setSelectedCamera(videoDevices[0].deviceId);
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    if (model && selectedCamera) {
       startWebcam();
     }
-  }, [model]);
+  }, [model, selectedCamera]);
 
   const startWebcam = () => {
-    var constraints = {
+    if (videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+    }
+
+    const constraints = {
       audio: false,
       video: {
         width: { ideal: VIDEO_WIDTH },
         height: { ideal: VIDEO_HEIGHT },
-        facingMode: "environment",
+        deviceId: selectedCamera
       },
     };
 
@@ -98,11 +115,10 @@ export default function App() {
         videoRef.current.play();
       };
 
-      videoRef.current.onplay = () => {
-        var ctx = canvasRef.current.getContext("2d");
-
-        var height = videoRef.current.videoHeight;
-        var width = videoRef.current.videoWidth;
+      videoRef.current.onloadeddata = () => {
+        const ctx = canvasRef.current.getContext("2d");
+        const height = videoRef.current.videoHeight;
+        const width = videoRef.current.videoWidth;
 
         videoRef.current.width = width;
         videoRef.current.height = height;
@@ -138,26 +154,31 @@ export default function App() {
   };
 
   const detectFrame = () => {
-    if (!model) setTimeout(detectFrame, 1000 / TARGET_FPS);
-
-    model.detect(videoRef.current).then((predictions) => {
-      // reset canvas
-      var ctx = canvasRef.current.getContext("2d");
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
-      // reset game state
-      const gameStateCopy = structuredClone(initialGameState);
-
-      for (var i = 0; i < predictions.length; i++) {
-        const prediction = predictions[i];
-        drawDetection(ctx, prediction);
-        updateGameState(prediction, gameStateCopy);
-      }
-
-      setGameState(gameStateCopy);
-
+    if (!model) {
       setTimeout(detectFrame, 1000 / TARGET_FPS);
-    });
+      return;
+    }
+
+    if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+      model.detect(videoRef.current).then((predictions) => {
+        // reset canvas
+        const ctx = canvasRef.current.getContext("2d");
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+        // reset game state
+        const gameStateCopy = structuredClone(initialGameState);
+
+        for (let i = 0; i < predictions.length; i++) {
+          const prediction = predictions[i];
+          drawDetection(ctx, prediction);
+          updateGameState(prediction, gameStateCopy);
+        }
+
+        setGameState(gameStateCopy);
+      });
+    }
+
+    setTimeout(detectFrame, 1000 / TARGET_FPS);
   };
 
   const drawDetection = (ctx, prediction) => {
@@ -187,6 +208,25 @@ export default function App() {
   return (
     <div>
       <div className="relative">
+        {/* video controls */}
+        <div className="absolute top-2 right-2 z-10">
+          <select 
+            className="bg-white p-2 rounded"
+            value={selectedCamera || ""}
+            onChange={(e) => setSelectedCamera(e.target.value)}
+          >
+            {cameras.map(camera => (
+              <option key={camera.deviceId} value={camera.deviceId}>
+                {camera.label}
+              </option>
+            ))}
+          </select>
+          <label className="flex items-center gap-2 ml-3">
+            <input type="checkbox" onChange={(e) => drawGuides(e.target.checked)} />
+            <span>Show guides</span>
+          </label>
+        </div>
+        {/* video */}
         <video
           width={VIDEO_WIDTH}
           height={VIDEO_HEIGHT}
@@ -206,13 +246,8 @@ export default function App() {
           className="absolute top-0 left-0"
         />
       </div>
+      {/* game controls */}
       <div className="p-2">
-        <label className="flex items-center gap-2">
-          <input type="checkbox" onChange={(e) => drawGuides(e.target.checked)} />
-          <span>Show guides</span>
-        </label>
-      </div>
-      <div className="border-t border-gray-200 p-2">
         <button className="px-4 py-2 rounded mb-2" onClick={() => console.log(gameState)}>Next move</button>
         <pre className="w-full h-24 p-2">
           {JSON.stringify(gameState, null, 2)}
