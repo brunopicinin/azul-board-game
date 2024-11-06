@@ -15,13 +15,21 @@ const COLORS = {
   light_blue: "#00FFFF",
 }
 
+const TEXT_COLORS = {
+  black: "white",
+  red: "white",
+  yellow: "black",
+  dark_blue: "white",
+  light_blue: "black",
+}
+
 const GUIDES = {
   disp1: ["black", {"x": 0.02, "y": 0.44}, {"x": 0.2, "y": 0.37}, {"x": 0.25, "y": 0.5}, {"x": 0.08, "y": 0.56}],
   disp2: ["black", {"x": 0.21, "y": 0.37}, {"x": 0.35, "y": 0.32}, {"x": 0.42, "y": 0.42}, {"x": 0.26, "y": 0.49}],
   disp3: ["black", {"x": 0.36, "y": 0.32}, {"x": 0.49, "y": 0.27}, {"x": 0.57, "y": 0.36}, {"x": 0.43, "y": 0.42}],
   disp4: ["black", {"x": 0.5, "y": 0.27}, {"x": 0.6, "y": 0.23}, {"x": 0.68, "y": 0.32}, {"x": 0.58, "y": 0.36}],
   disp5: ["black", {"x": 0.61, "y": 0.23}, {"x": 0.71, "y": 0.19}, {"x": 0.79, "y": 0.27}, {"x": 0.68, "y": 0.32}],
-  middle: ["gray", {"x": 0.02, "y": 0.28}, {"x": 0.55, "y": 0.14}, {"x": 0.63, "y": 0.22}, {"x": 0.07, "y": 0.42}],
+  floor: ["gray", {"x": 0.02, "y": 0.28}, {"x": 0.55, "y": 0.14}, {"x": 0.63, "y": 0.22}, {"x": 0.07, "y": 0.42}],
   row1: ["red", {"x": 0.57, "y": 0.5}, {"x": 0.61, "y": 0.48}, {"x": 0.63, "y": 0.51}, {"x": 0.59, "y": 0.53}],
   row2: ["yellow", {"x": 0.57, "y": 0.55}, {"x": 0.64, "y": 0.5}, {"x": 0.66, "y": 0.53}, {"x": 0.59, "y": 0.58}],
   row3: ["cyan", {"x": 0.56, "y": 0.6}, {"x": 0.66, "y": 0.53}, {"x": 0.69, "y": 0.56}, {"x": 0.59, "y": 0.64}],
@@ -54,12 +62,112 @@ const isPointInPolygon = (point, polygon) => {
   return inside;
 };
 
+const listPossiblePicks = (gameState) => {
+  const displays = ["disp1", "disp2", "disp3", "disp4", "disp5", "floor"];
+  const possiblePicks = [];
+
+  for (const display of displays) {
+    const tiles = gameState[display];
+    if (tiles.length === 0) continue;
+
+    // Get unique colors in this display
+    const colors = [...new Set(tiles)];
+
+    // For each color, create a pick with all tiles of that color
+    for (const color of colors) {
+      const colorTiles = tiles.filter(tile => tile === color);
+      possiblePicks.push({
+        display,
+        color,
+        count: colorTiles.length
+      });
+    }
+  }
+
+  return possiblePicks;
+}
+
+const listPossiblePlays = (gameState) => {
+  const possiblePicks = listPossiblePicks(gameState);
+  const possiblePlays = [];
+
+  for (const pick of possiblePicks) {
+    const display = pick.display;
+    const color = pick.color;
+    const count = pick.count;
+
+    // Check each row
+    for (let rowNum = 1; rowNum <= 5; rowNum++) {
+      const rowKey = `row${rowNum}`;
+      const sqrKey = `sqr${rowNum}`;
+      const rowTiles = gameState[rowKey];
+      const sqrTiles = gameState[sqrKey];
+
+      // Skip if square already has this color
+      if (sqrTiles.includes(color)) {
+        continue;
+      }
+
+      // Row must be empty or only contain same color
+      if (rowTiles.length === 0 || rowTiles.every(tile => tile === color)) {
+        possiblePlays.push({
+          pick: {
+            display,
+            color,
+            count
+          },
+          row: rowNum
+        });
+      }
+    }
+  }
+
+  return possiblePlays;
+}
+
+const rankPossiblePlays = (gameState) => {
+  const possiblePlays = listPossiblePlays(gameState);
+
+  // Calculate score for each play
+  const scoredPlays = possiblePlays.map(play => {
+    const rowNum = play.row;
+    const rowCapacity = rowNum; // row number equals its capacity
+    const currentTiles = gameState[`row${rowNum}`].length;
+    const remainingCapacity = rowCapacity - currentTiles;
+    const pickedTiles = play.pick.count;
+
+    let score = 0;
+
+    // Add points for tiles that fit in remaining capacity
+    const fittingTiles = Math.min(remainingCapacity, pickedTiles);
+    score += fittingTiles;
+
+    // Add points for total tiles that will be in row after pick
+    const finalTileCount = currentTiles + fittingTiles;
+    score += finalTileCount * 2;
+
+    // Subtract points for empty spaces left in row after placing tiles
+    const emptySpacesAfterPlacement = Math.max(0, remainingCapacity - pickedTiles);
+    score -= emptySpacesAfterPlacement * 3;
+
+    // Subtract points for overflow tiles
+    const overflowTiles = Math.max(0, pickedTiles - remainingCapacity);
+    score -= overflowTiles * 5;
+
+    return { ...play, score };
+  });
+
+  // Sort by score in descending order
+  return scoredPlays.sort((a, b) => b.score - a.score);
+}
+
 export default function App() {
   const [model, setModel] = useState(null);
   const [modelLoading, setModelLoading] = useState(false);
   const [cameras, setCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [gameState, setGameState] = useState(initialGameState);
+  const [suggestedMoves, setSuggestedMoves] = useState([]);
 
   const videoRef = useRef();
   const canvasRef = useRef();
@@ -205,12 +313,17 @@ export default function App() {
     });
   }
 
+  const handleSuggestMoves = () => {
+    const suggestedMoves = rankPossiblePlays(gameState).slice(0, 5);
+    setSuggestedMoves(suggestedMoves);
+  }
+
   return (
     <div>
       <div className="relative">
         {/* video controls */}
         <div className="absolute top-2 right-2 z-10">
-          <select 
+          <select
             className="bg-white p-2 rounded"
             value={selectedCamera || ""}
             onChange={(e) => setSelectedCamera(e.target.value)}
@@ -248,10 +361,36 @@ export default function App() {
       </div>
       {/* game controls */}
       <div className="p-2">
-        <button className="px-4 py-2 rounded mb-2" onClick={() => console.log(gameState)}>Next move</button>
-        <pre className="w-full h-24 p-2">
-          {JSON.stringify(gameState, null, 2)}
-        </pre>
+        <button className="px-4 py-2 rounded mb-2 flex items-center gap-2" onClick={handleSuggestMoves}>
+          <svg className="w-4 h-4 text-white fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M349.4 44.6c5.9-13.7 1.5-29.7-10.6-38.5s-28.6-8-39.9 1.8l-256 224c-10 8.8-13.6 22.9-8.9 35.3S50.7 288 64 288l111.5 0L98.6 467.4c-5.9 13.7-1.5 29.7 10.6 38.5s28.6 8 39.9-1.8l256-224c10-8.8 13.6-22.9 8.9-35.3s-16.6-20.7-30-20.7l-111.5 0L349.4 44.6z"/></svg>
+          Suggest Moves
+        </button>
+        <div className="p-1">
+          {suggestedMoves.map((move, index) => (
+            <div key={index} className="mt-2">
+              Pick {move.pick.count}
+              {" "}
+              <span
+                className="px-2 py-1 rounded-full text-sm"
+                style={{ backgroundColor: COLORS[move.pick.color], color: TEXT_COLORS[move.pick.color] }}
+              >
+                {move.pick.color.replace("_", " ")}
+              </span>
+              {" "}
+              from
+              {" "}
+              <span
+                className="px-2 py-1 rounded-full bg-slate-300 text-sm"
+              >
+                {move.pick.display.replace("disp", "display ")}
+              </span>
+              {" "}
+              and place in
+              {" "}
+              <span className="px-2 py-1 rounded-full bg-slate-300 text-sm">row {move.row}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
