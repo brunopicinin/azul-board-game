@@ -3,6 +3,8 @@
 import { InferenceEngine, CVImage } from "inferencejs";
 import { useEffect, useRef, useState, useMemo } from "react";
 
+const TARGET_FPS = 30;
+
 const GUIDES = {
   disp1: ["black", {"x": 0.03, "y": 0.44}, {"x": 0.2, "y": 0.38}, {"x": 0.24, "y": 0.5}, {"x": 0.08, "y": 0.56}],
   disp2: ["black", {"x": 0.22, "y": 0.37}, {"x": 0.35, "y": 0.32}, {"x": 0.41, "y": 0.41}, {"x": 0.27, "y": 0.47}],
@@ -16,7 +18,52 @@ const GUIDES = {
   row4: ["green", {"x": 0.55, "y": 0.66}, {"x": 0.69, "y": 0.57}, {"x": 0.72, "y": 0.61}, {"x": 0.59, "y": 0.7}],
   row5: ["red", {"x": 0.55, "y": 0.73}, {"x": 0.73, "y": 0.61}, {"x": 0.76, "y": 0.64}, {"x": 0.58, "y": 0.77}],
   squares: ["lightblue", {"x": 0.75, "y": 0.41}, {"x": 0.9, "y": 0.53}, {"x": 0.78, "y": 0.63}, {"x": 0.62, "y": 0.48}]
-}
+};
+
+const gameState = {
+  disp1: [],
+  disp2: [],
+  disp3: [],
+  disp4: [],
+  disp5: [],
+  middle: [],
+  row1: [],
+  row2: [],
+  row3: [],
+  row4: [],
+  row5: [],
+  squares: []
+};
+
+const resetGameState = () => {
+  gameState.disp1 = [];
+  gameState.disp2 = [];
+  gameState.disp3 = [];
+  gameState.disp4 = [];
+  gameState.disp5 = [];
+  gameState.middle = [];
+  gameState.row1 = [];
+  gameState.row2 = [];
+  gameState.row3 = [];
+  gameState.row4 = [];
+  gameState.row5 = [];
+  gameState.squares = [];
+};
+
+const isPointInPolygon = (point, polygon) => {
+  let inside = false;
+  for (let i = 0, j = 3; i <= 3; j = i++) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+
+    const intersect = ((yi > point.y) !== (yj > point.y))
+        && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+};
 
 export default function App() {
   const inferEngine = useMemo(() => {
@@ -102,52 +149,50 @@ export default function App() {
   };
 
   const detectFrame = () => {
-    if (!modelWorkerId) setTimeout(detectFrame, 100 / 3);
+    if (!modelWorkerId) setTimeout(detectFrame, 1000 / TARGET_FPS);
 
     const img = new CVImage(videoRef.current);
     inferEngine.infer(modelWorkerId, img).then((predictions) => {
+      // reset canvas
       var ctx = canvasRef.current.getContext("2d");
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
+      // reset game state
+      resetGameState();
+
       for (var i = 0; i < predictions.length; i++) {
-        console.log(predictions[i]);
-        var prediction = predictions[i];
-
-        // draw detections
-        ctx.strokeStyle = prediction.color;
-
-        var x = prediction.bbox.x - prediction.bbox.width / 2;
-        var y = prediction.bbox.y - prediction.bbox.height / 2;
-        var width = prediction.bbox.width;
-        var height = prediction.bbox.height;
-
-        ctx.rect(x, y, width, height);
-        ctx.fillStyle = "rgba(0, 0, 0, 0)";
-        ctx.fill();
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.lineWidth = "4";
-        ctx.strokeRect(x, y, width, height);
-
-        var text = ctx.measureText(
-          prediction.class + " " + Math.round(prediction.confidence * 100) + "%"
-        );
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.fillRect(x - 2, y - 30, text.width + 4, 30);
-        ctx.font = "15px monospace";
-        ctx.fillStyle = "black";
-        ctx.fillText(
-          prediction.class +
-            " " +
-            Math.round(prediction.confidence * 100) +
-            "%",
-          x,
-          y - 10
-        );
+        const prediction = predictions[i];
+        drawDetection(ctx, prediction);
+        updateGameState(prediction);
       }
 
-      setTimeout(detectFrame, 100 / 3);
+      setTimeout(detectFrame, 1000 / TARGET_FPS);
     });
   };
+
+  const drawDetection = (ctx, prediction) => {
+    const x = prediction.bbox.x - prediction.bbox.width / 2;
+    const y = prediction.bbox.y - prediction.bbox.height / 2;
+    const width = prediction.bbox.width;
+    const height = prediction.bbox.height;
+
+    ctx.strokeStyle = prediction.color;
+    ctx.lineWidth = "2";
+    ctx.strokeRect(x, y, width, height);
+  }
+
+  const updateGameState = (prediction) => {
+    const centerPoint = {
+      x: prediction.bbox.x / canvasRef.current.width,
+      y: prediction.bbox.y / canvasRef.current.height
+    };
+
+    Object.entries(GUIDES).forEach(([guideName, guide]) => {
+      if (isPointInPolygon(centerPoint, guide.slice(1))) {
+        gameState[guideName].push(prediction.class);
+      }
+    });
+  }
 
   return (
     <div>
