@@ -1,9 +1,19 @@
 "use client";
 
-import { InferenceEngine, CVImage } from "inferencejs";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 
-const TARGET_FPS = 30;
+const TARGET_FPS = 15;
+
+const VIDEO_WIDTH = 640;
+const VIDEO_HEIGHT = 480;
+
+const COLORS = {
+  black: "#000000",
+  red: "#FF0000",
+  yellow: "#FFFF00",
+  dark_blue: "#0000FF",
+  light_blue: "#00FFFF",
+}
 
 const GUIDES = {
   disp1: ["black", {"x": 0.02, "y": 0.44}, {"x": 0.2, "y": 0.37}, {"x": 0.25, "y": 0.5}, {"x": 0.08, "y": 0.56}],
@@ -45,11 +55,7 @@ const isPointInPolygon = (point, polygon) => {
 };
 
 export default function App() {
-  const inferEngine = useMemo(() => {
-    return new InferenceEngine();
-  }, []);
-
-  const [modelWorkerId, setModelWorkerId] = useState(null);
+  const [model, setModel] = useState(null);
   const [modelLoading, setModelLoading] = useState(false);
   const [gameState, setGameState] = useState(initialGameState);
 
@@ -60,25 +66,28 @@ export default function App() {
   useEffect(() => {
     if (!modelLoading) {
       setModelLoading(true);
-      inferEngine
-        .startWorker("azul-board-game", 3, process.env.NEXT_PUBLIC_ROBOFLOW_API_KEY)
-        .then((id) => setModelWorkerId(id));
+      window.roboflow
+        .auth({ publishable_key: process.env.NEXT_PUBLIC_ROBOFLOW_API_KEY })
+        .load({ model: "azul-board-game", version: 3 })
+        .then((m) => {
+          m.configure({ threshold: 0.5, overlap: 0.25, max_objects: 200 });
+          setModel(m);
+        });
     }
-  }, [inferEngine, modelLoading]);
+  }, [modelLoading]);
 
   useEffect(() => {
-    console.log("Model Worker ID: " + modelWorkerId);
-    if (modelWorkerId) {
+    if (model) {
       startWebcam();
     }
-  }, [modelWorkerId]);
+  }, [model]);
 
   const startWebcam = () => {
     var constraints = {
       audio: false,
       video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
+        width: { ideal: VIDEO_WIDTH },
+        height: { ideal: VIDEO_HEIGHT },
         facingMode: "environment",
       },
     };
@@ -129,10 +138,9 @@ export default function App() {
   };
 
   const detectFrame = () => {
-    if (!modelWorkerId) setTimeout(detectFrame, 1000 / TARGET_FPS);
+    if (!model) setTimeout(detectFrame, 1000 / TARGET_FPS);
 
-    const img = new CVImage(videoRef.current);
-    inferEngine.infer(modelWorkerId, img).then((predictions) => {
+    model.detect(videoRef.current).then((predictions) => {
       // reset canvas
       var ctx = canvasRef.current.getContext("2d");
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -158,7 +166,7 @@ export default function App() {
     const width = prediction.bbox.width;
     const height = prediction.bbox.height;
 
-    ctx.strokeStyle = prediction.color;
+    ctx.strokeStyle = COLORS[prediction.class];
     ctx.lineWidth = "2";
     ctx.strokeRect(x, y, width, height);
   }
@@ -180,20 +188,20 @@ export default function App() {
     <div>
       <div className="relative">
         <video
-          width="640"
-          height="480"
+          width={VIDEO_WIDTH}
+          height={VIDEO_HEIGHT}
           ref={videoRef}
           className="relative"
         />
         <canvas
-          width="640"
-          height="480"
+          width={VIDEO_WIDTH}
+          height={VIDEO_HEIGHT}
           ref={canvasRef}
           className="absolute top-0 left-0"
         />
         <canvas
-          width="640"
-          height="480"
+          width={VIDEO_WIDTH}
+          height={VIDEO_HEIGHT}
           ref={guidesRef}
           className="absolute top-0 left-0"
         />
