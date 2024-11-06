@@ -6,49 +6,28 @@ import { useEffect, useRef, useState, useMemo } from "react";
 const TARGET_FPS = 30;
 
 const GUIDES = {
-  disp1: ["black", {"x": 0.03, "y": 0.44}, {"x": 0.2, "y": 0.38}, {"x": 0.24, "y": 0.5}, {"x": 0.08, "y": 0.56}],
-  disp2: ["black", {"x": 0.22, "y": 0.37}, {"x": 0.35, "y": 0.32}, {"x": 0.41, "y": 0.41}, {"x": 0.27, "y": 0.47}],
-  disp3: ["black", {"x": 0.38, "y": 0.32}, {"x": 0.49, "y": 0.28}, {"x": 0.55, "y": 0.35}, {"x": 0.44, "y": 0.4}],
-  disp4: ["black", {"x": 0.51, "y": 0.28}, {"x": 0.61, "y": 0.24}, {"x": 0.66, "y": 0.3}, {"x": 0.56, "y": 0.34}],
-  disp5: ["black", {"x": 0.62, "y": 0.24}, {"x": 0.7, "y": 0.21}, {"x": 0.76, "y": 0.27}, {"x": 0.68, "y": 0.3}],
-  middle: ["darkgray", {"x": 0.02, "y": 0.3}, {"x": 0.56, "y": 0.14}, {"x": 0.63, "y": 0.23}, {"x": 0.07, "y": 0.41}],
-  row1: ["white", {"x": 0.57, "y": 0.5}, {"x": 0.61, "y": 0.49}, {"x": 0.63, "y": 0.5}, {"x": 0.6, "y": 0.53}],
-  row2: ["yellow", {"x": 0.57, "y": 0.55}, {"x": 0.63, "y": 0.51}, {"x": 0.66, "y": 0.53}, {"x": 0.59, "y": 0.57}],
-  row3: ["blue", {"x": 0.56, "y": 0.6}, {"x": 0.66, "y": 0.53}, {"x": 0.69, "y": 0.57}, {"x": 0.59, "y": 0.63}],
-  row4: ["green", {"x": 0.55, "y": 0.66}, {"x": 0.69, "y": 0.57}, {"x": 0.72, "y": 0.61}, {"x": 0.59, "y": 0.7}],
-  row5: ["red", {"x": 0.55, "y": 0.73}, {"x": 0.73, "y": 0.61}, {"x": 0.76, "y": 0.64}, {"x": 0.58, "y": 0.77}],
-  squares: ["lightblue", {"x": 0.75, "y": 0.41}, {"x": 0.9, "y": 0.53}, {"x": 0.78, "y": 0.63}, {"x": 0.62, "y": 0.48}]
-};
+  disp1: ["black", {"x": 0.02, "y": 0.44}, {"x": 0.2, "y": 0.37}, {"x": 0.25, "y": 0.5}, {"x": 0.08, "y": 0.56}],
+  disp2: ["black", {"x": 0.21, "y": 0.37}, {"x": 0.35, "y": 0.32}, {"x": 0.42, "y": 0.42}, {"x": 0.26, "y": 0.49}],
+  disp3: ["black", {"x": 0.36, "y": 0.32}, {"x": 0.49, "y": 0.27}, {"x": 0.57, "y": 0.36}, {"x": 0.43, "y": 0.42}],
+  disp4: ["black", {"x": 0.5, "y": 0.27}, {"x": 0.6, "y": 0.23}, {"x": 0.68, "y": 0.32}, {"x": 0.58, "y": 0.36}],
+  disp5: ["black", {"x": 0.61, "y": 0.23}, {"x": 0.71, "y": 0.19}, {"x": 0.79, "y": 0.27}, {"x": 0.68, "y": 0.32}],
+  middle: ["gray", {"x": 0.02, "y": 0.28}, {"x": 0.55, "y": 0.14}, {"x": 0.63, "y": 0.22}, {"x": 0.07, "y": 0.42}],
+  row1: ["red", {"x": 0.57, "y": 0.5}, {"x": 0.61, "y": 0.48}, {"x": 0.63, "y": 0.51}, {"x": 0.59, "y": 0.53}],
+  row2: ["yellow", {"x": 0.57, "y": 0.55}, {"x": 0.64, "y": 0.5}, {"x": 0.66, "y": 0.53}, {"x": 0.59, "y": 0.58}],
+  row3: ["cyan", {"x": 0.56, "y": 0.6}, {"x": 0.66, "y": 0.53}, {"x": 0.69, "y": 0.56}, {"x": 0.59, "y": 0.64}],
+  row4: ["blue", {"x": 0.55, "y": 0.66}, {"x": 0.69, "y": 0.57}, {"x": 0.73, "y": 0.6}, {"x": 0.58, "y": 0.7}],
+  row5: ["magenta", {"x": 0.55, "y": 0.73}, {"x": 0.73, "y": 0.61}, {"x": 0.76, "y": 0.64}, {"x": 0.58, "y": 0.78}],
+  sqr1: ["darkred", {"x": 0.74, "y": 0.41}, {"x": 0.77, "y": 0.43}, {"x": 0.64, "y": 0.51}, {"x": 0.62, "y": 0.48}],
+  sqr2: ["gold", {"x": 0.78, "y": 0.43}, {"x": 0.8, "y": 0.46}, {"x": 0.67, "y": 0.53}, {"x": 0.65, "y": 0.51}],
+  sqr3: ["turquoise", {"x": 0.8, "y": 0.46}, {"x": 0.84, "y": 0.48}, {"x": 0.7, "y": 0.56}, {"x": 0.68, "y": 0.53}],
+  sqr4: ["darkblue", {"x": 0.84, "y": 0.48}, {"x": 0.87, "y": 0.51}, {"x": 0.74, "y": 0.6}, {"x": 0.7, "y": 0.56}],
+  sqr5: ["darkmagenta", {"x": 0.87, "y": 0.51}, {"x": 0.91, "y": 0.54}, {"x": 0.78, "y": 0.64}, {"x": 0.74, "y": 0.6}]
+}
 
-const gameState = {
-  disp1: [],
-  disp2: [],
-  disp3: [],
-  disp4: [],
-  disp5: [],
-  middle: [],
-  row1: [],
-  row2: [],
-  row3: [],
-  row4: [],
-  row5: [],
-  squares: []
-};
-
-const resetGameState = () => {
-  gameState.disp1 = [];
-  gameState.disp2 = [];
-  gameState.disp3 = [];
-  gameState.disp4 = [];
-  gameState.disp5 = [];
-  gameState.middle = [];
-  gameState.row1 = [];
-  gameState.row2 = [];
-  gameState.row3 = [];
-  gameState.row4 = [];
-  gameState.row5 = [];
-  gameState.squares = [];
-};
+const initialGameState = Object.keys(GUIDES).reduce((acc, key) => {
+  acc[key] = [];
+  return acc;
+}, {});
 
 const isPointInPolygon = (point, polygon) => {
   let inside = false;
@@ -72,6 +51,7 @@ export default function App() {
 
   const [modelWorkerId, setModelWorkerId] = useState(null);
   const [modelLoading, setModelLoading] = useState(false);
+  const [gameState, setGameState] = useState(initialGameState);
 
   const videoRef = useRef();
   const canvasRef = useRef();
@@ -158,13 +138,15 @@ export default function App() {
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
       // reset game state
-      resetGameState();
+      const gameStateCopy = structuredClone(initialGameState);
 
       for (var i = 0; i < predictions.length; i++) {
         const prediction = predictions[i];
         drawDetection(ctx, prediction);
-        updateGameState(prediction);
+        updateGameState(prediction, gameStateCopy);
       }
+
+      setGameState(gameStateCopy);
 
       setTimeout(detectFrame, 1000 / TARGET_FPS);
     });
@@ -181,7 +163,7 @@ export default function App() {
     ctx.strokeRect(x, y, width, height);
   }
 
-  const updateGameState = (prediction) => {
+  const updateGameState = (prediction, gameStateCopy) => {
     const centerPoint = {
       x: prediction.bbox.x / canvasRef.current.width,
       y: prediction.bbox.y / canvasRef.current.height
@@ -189,7 +171,7 @@ export default function App() {
 
     Object.entries(GUIDES).forEach(([guideName, guide]) => {
       if (isPointInPolygon(centerPoint, guide.slice(1))) {
-        gameState[guideName].push(prediction.class);
+        gameStateCopy[guideName].push(prediction.class);
       }
     });
   }
@@ -216,11 +198,17 @@ export default function App() {
           className="absolute top-0 left-0"
         />
       </div>
-      <div className="mt-2">
-        <label className="flex items-center gap-2 ml-2">
+      <div className="p-2">
+        <label className="flex items-center gap-2">
           <input type="checkbox" onChange={(e) => drawGuides(e.target.checked)} />
           <span>Show guides</span>
         </label>
+      </div>
+      <div className="border-t border-gray-200 p-2">
+        <button className="px-4 py-2 rounded mb-2" onClick={() => console.log(gameState)}>Next move</button>
+        <pre className="w-full h-24 p-2">
+          {JSON.stringify(gameState, null, 2)}
+        </pre>
       </div>
     </div>
   );
